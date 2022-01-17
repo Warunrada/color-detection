@@ -1,0 +1,210 @@
+from tkinter import *
+from PIL import Image
+from PIL import ImageTk
+from tkinter import filedialog
+import numpy as np 
+import cv2
+import pandas as pd
+
+# --------------------------------------------------------------------------
+
+csv_path = 'colors.csv'
+webcam = cv2.VideoCapture(0)
+
+# reading csv file
+index = ['color', 'color_name', 'hex', 'R', 'G', 'B']
+df = pd.read_csv(csv_path, names=index, header=None)
+
+#declaring global variables
+clicked = False
+r = g = b = xpos = ypos = 0
+
+root = Tk()
+root.title("COLOR DETECTION")
+#ขนาดและตำแหน่ง
+root.geometry("390x325+150+50")
+root.configure(bg = "#34495E")
+
+def scan_video():
+	while(1): 
+	
+		# Reading the video from the 
+		# webcam in image frames 
+		_, imageFrame = webcam.read() 
+
+		# Convert the imageFrame in 
+		# BGR(RGB color space) to 
+		# HSV(hue-saturation-value) 
+		# color space 
+		hsvFrame = cv2.cvtColor(imageFrame, cv2.COLOR_BGR2HSV) 
+
+		# Set range for red color and 
+		# define mask 
+		red_lower = np.array([136, 87, 111], np.uint8) 
+		red_upper = np.array([180, 255, 255], np.uint8) 
+		red_mask = cv2.inRange(hsvFrame, red_lower, red_upper) 
+
+		# Set range for green color and 
+		# define mask 
+		green_lower = np.array([25, 52, 72], np.uint8) 
+		green_upper = np.array([102, 255, 255], np.uint8) 
+		green_mask = cv2.inRange(hsvFrame, green_lower, green_upper) 
+
+		# Set range for blue color and 
+		# define mask 
+		blue_lower = np.array([94, 80, 2], np.uint8) 
+		blue_upper = np.array([120, 255, 255], np.uint8) 
+		blue_mask = cv2.inRange(hsvFrame, blue_lower, blue_upper) 
+	
+		kernal = np.ones((5, 5), "uint8") 
+	
+		# For red color 
+		red_mask = cv2.dilate(red_mask, kernal) 
+		res_red = cv2.bitwise_and(imageFrame, imageFrame, 
+							mask = red_mask) 
+	
+		# For green color 
+		green_mask = cv2.dilate(green_mask, kernal) 
+		res_green = cv2.bitwise_and(imageFrame, imageFrame, 
+								mask = green_mask) 
+	
+		# For blue color 
+		blue_mask = cv2.dilate(blue_mask, kernal) 
+		res_blue = cv2.bitwise_and(imageFrame, imageFrame, 
+							mask = blue_mask) 
+
+		# Creating contour to track red color 
+		contours, hierarchy = cv2.findContours(red_mask, 
+										cv2.RETR_TREE, 
+										cv2.CHAIN_APPROX_SIMPLE) 
+	
+		for pic, contour in enumerate(contours): 
+			area = cv2.contourArea(contour) 
+			if(area > 300): 
+				x, y, w, h = cv2.boundingRect(contour) 
+				imageFrame = cv2.rectangle(imageFrame, (x, y), 
+									(x + w, y + h), 
+									(0, 0, 255), 2) 
+			
+				cv2.putText(imageFrame, "Red Colour", (x, y), 
+						cv2.FONT_HERSHEY_SIMPLEX, 1.0, 
+						(0, 0, 255))	 
+
+		# Creating contour to track green color 
+		contours, hierarchy = cv2.findContours(green_mask, 
+										cv2.RETR_TREE, 
+										cv2.CHAIN_APPROX_SIMPLE) 
+	
+		for pic, contour in enumerate(contours): 
+			area = cv2.contourArea(contour) 
+			if(area > 300): 
+				x, y, w, h = cv2.boundingRect(contour) 
+				imageFrame = cv2.rectangle(imageFrame, (x, y), 
+									(x + w, y + h), 
+									(0, 255, 0), 2) 
+			
+				cv2.putText(imageFrame, "Green Colour", (x, y), 
+						cv2.FONT_HERSHEY_SIMPLEX, 
+						1.0, (0, 255, 0)) 
+
+		# Creating contour to track blue color 
+		contours, hierarchy = cv2.findContours(blue_mask, 
+										cv2.RETR_TREE, 
+										cv2.CHAIN_APPROX_SIMPLE) 
+		for pic, contour in enumerate(contours): 
+			area = cv2.contourArea(contour) 
+			if(area > 300): 
+				x, y, w, h = cv2.boundingRect(contour) 
+				imageFrame = cv2.rectangle(imageFrame, (x, y), 
+									(x + w, y + h), 
+									(255, 0, 0), 2) 
+			
+				cv2.putText(imageFrame, "Blue Colour", (x, y), 
+						cv2.FONT_HERSHEY_SIMPLEX, 
+						1.0, (255, 0, 0)) 
+			
+		# Program Termination 
+		cv2.imshow("Multiple Color Detection in Real-TIme", imageFrame) 
+		if cv2.waitKey(10) & 0xFF == ord('q'): 
+			cap.release() 
+			cv2.destroyAllWindows() 
+		break
+
+def scan_image():
+	#function to calculate minimum distance from all colors and get the most matching color
+	def get_color_name(R,G,B):
+		minimum = 1000
+		for i in range(len(df)):
+			d = abs(R - int(df.loc[i,'R'])) + abs(G - int(df.loc[i,'G'])) + abs(B - int(df.loc[i,'B']))
+			if d <= minimum:
+				minimum = d
+				cname = df.loc[i, 'color_name']
+
+		return cname
+	#function to get x,y coordinates of mouse double click
+	def draw_function(event, x, y, flags, params):
+		if event == cv2.EVENT_LBUTTONDBLCLK:
+			global b, g, r, xpos, ypos, clicked
+			clicked = True
+			xpos = x
+			ypos = y
+			b,g,r = img[y,x]
+			b = int(b)
+			g = int(g)
+			r = int(r)
+	# reading image
+	img_path = filedialog.askopenfilename()
+	img = cv2.imread(img_path)
+	img = cv2.resize(img, (725,600))
+	cv2.namedWindow('image')
+	cv2.setMouseCallback('image', draw_function)
+	while True:
+		cv2.imshow('image', img)
+		if clicked:
+			#           (image, startpoint, endpoint, color, thickness)-1 
+			cv2.rectangle(img, (20,20), (600,60), (b,g,r), -1)
+
+			               #( Color name and RGB values )
+			text = get_color_name(r,g,b) + ' R=' + str(r) + ' G=' + str(g) + ' B=' + str(b)
+					  #(img,text,start,font(0-7),fontScale,color,thickness,lineType )
+			cv2.putText(img, text, (50,50), 2,0.8, (255,255,255),2,cv2.LINE_AA)
+
+			#รูปสว่างมากให้ตัวหนังสือมืด
+			if r+g+b >=600:
+				cv2.putText(img, text, (50,50), 2,0.8, (0,0,0),2,cv2.LINE_AA)
+
+		if cv2.waitKey(20) & 0xFF == 27:
+			break
+	cv2.destroyAllWindows()
+
+label1 = Label(
+    root,
+    text = "COLOR",
+    font=("arial italic", 35, 'bold'),
+    fg = "#ffffff",
+    bg = "#34495E"
+    ).place(x=105,y=50)
+label2 = Label(
+    root,
+    text = "DETECTION",
+    font=("arial italic", 25)
+    ).place(x=100,y=100)
+btn1 = Button(
+    root,
+    text = "UPLOAD IMAGE",
+    font=("Maven Pro", 10),
+    padx = 16, pady = 12,
+    relief = "ridge",
+    command = scan_image
+    ).place(x=50,y=220)
+
+btn2 = Button(
+    root,
+    text = "CAMERA",
+    font=("Maven Pro", 10),
+    padx = 34.4, pady = 12,
+    relief = "ridge",
+    command = scan_video
+    ).place(x=210,y=220)
+
+root.mainloop()
